@@ -1,6 +1,4 @@
-LICENSE
 README.md
-setup.cfg
 setup.py
 evsme/__init__.py
 evsme/evidence_theory_utils.py

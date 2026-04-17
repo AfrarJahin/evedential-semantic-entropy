@@ -1,0 +1,66 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Packaging and build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env/
+.conda/
+
+# Conda-generated temporary requirement files
+condaenv.*.requirements.txt
+
+# Local environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Experiment outputs and logs
+EXP/
+outputs/
+results/
+runs/
+wandb/
+logs/
+*.log
+
+# Data, checkpoints, and model artifacts
+data/
+datasets/
+checkpoints/
+models/
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+*.bin
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo

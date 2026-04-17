@@ -11,7 +11,7 @@ This code is build on [kernel language entropy codebase](https://github.com/Alex
 EvidentialSemanticEntropy/
 ├── README.md
 ├── setup.py                          # Package setup (package name: kle)
-├── requirements.txt                  # All dependencies
+├── environment.yml                   # Conda environment
 ├── configs/
 │   └── data_config.yaml             # Device & HuggingFace cache config
 ├── evsme/                           # Evidential Semantic Entropy module (new)
@@ -38,27 +38,19 @@ EvidentialSemanticEntropy/
 
 ## Installation
 
-**Step 1 — Create and activate a virtual environment:**
+**Step 1 - Create the Conda environment:**
 
 ```bash
-python3 -m venv path/to/new/EvSemE
-source path/to/new/EvSemE/bin/activate        # Linux/Mac
-# path\to\new\EvSemE\Scripts\activate         # Windows
+conda env create -f environment.yml
 ```
 
-**Step 2 — Install dependencies:**
+**Step 2 - Activate the environment:**
 
 ```bash
-pip install -r requirements.txt
+conda activate evsme
 ```
 
-**Step 3 — Install the package (required for imports to resolve):**
-
-```bash
-pip install -e .
-```
-
-> **Note:** The codebase requires CUDA-capable GPUs. `requirements.txt` pins CUDA 12 libraries (`nvidia-*-cu12`). Multi-GPU setups are supported via `configs/data_config.yaml` (see below).
+> **Note:** The codebase requires CUDA-capable GPUs. `environment.yml` pins CUDA 12 libraries (`nvidia-*-cu12`) and installs this package in editable mode. Multi-GPU setups are supported via `configs/data_config.yaml` (see below).
 
 ---
 
