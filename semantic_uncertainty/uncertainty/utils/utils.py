@@ -49,6 +49,10 @@ def get_parser(stages=['generate', 'compute']):
             help="Max number of tokens generated.",
         )
         parser.add_argument(
+            "--force_cpu", action="store_true", default=False,
+            help="Force model to run on CPU regardless of GPU availability.",
+        )
+        parser.add_argument(
             "--dataset", type=str, default="trivia_qa",
             choices=['trivia_qa', 'squad', 'bioasq', 'nq', 'svamp'],
             help="Dataset to use")
@@ -297,19 +301,25 @@ def get_reference(example):
     return reference
 
 
+def _is_known_model(mn):
+    return any(k in mn.lower() for k in ('llama', 'mistral', 'tinyllama', 'phi-2')) or 'falcon' in mn
+
+
 def init_model(args):
     mn = args.model_name
-    if 'llama' in mn.lower() or 'falcon' in mn or 'mistral' in mn.lower():
+    force_cpu = getattr(args, 'force_cpu', False)
+    if _is_known_model(mn):
         model = HuggingfaceModel(
             mn, stop_sequences='default',
-            max_new_tokens=args.model_max_new_tokens)
+            max_new_tokens=args.model_max_new_tokens,
+            force_cpu=force_cpu)
     else:
         raise ValueError(f'Unknown model_name `{mn}`.')
     return model
 
 
 def init_model_from_name(mn, max_new_tokens=50):
-    if 'llama' in mn.lower() or 'falcon' in mn or 'mistral' in mn.lower():
+    if _is_known_model(mn):
         model = HuggingfaceModel(
             mn, stop_sequences='default',
             max_new_tokens=max_new_tokens)

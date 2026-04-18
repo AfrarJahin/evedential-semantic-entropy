@@ -186,7 +186,8 @@ def main(args):
 
     user = os.environ['USER']
     scratch_dir = os.getenv('SCRATCH_DIR', '.')
-    wandb_dir = f'{scratch_dir}/{user}/uncertainty'
+    parent_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+    wandb_dir = f'{parent_dir}/EXP'
     slurm_jobid = os.getenv('SLURM_JOB_ID', None)
     project = "semantic_uncertainty" if not args.debug else "semantic_uncertainty_debug"
 

@@ -101,6 +101,19 @@ python semantic_uncertainty/generate_answers.py \
     --compute_kle
 ```
 
+
+test experiment:
+```bash
+python semantic_uncertainty/generate_answers.py \
+    --model_name=TinyLlama-1.1B-Chat-v1.0 \
+    --dataset=trivia_qa \
+    --num_samples=5 \
+    --num_generations=3 \
+    --random_seed=42 \
+    --force_cpu
+
+```
+
 - `$MODEL` is one of:
   `Llama-2-7b`, `Llama-2-13b`, `Llama-2-7b-chat`, `Llama-2-13b-chat`,
   `falcon-7b`, `falcon-40b`, `falcon-40b-instruct`, `falcon-7b-instruct`,

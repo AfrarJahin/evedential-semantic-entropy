@@ -18,6 +18,15 @@ from huggingface_hub import snapshot_download
 from uncertainty.models.base_model import BaseModel
 from uncertainty.models.base_model import STOP_SEQUENCES
 
+def _get_device_map(min_vram_gb=4, force_cpu=False):
+    """Use GPU only if CUDA is available, has enough VRAM, and CPU not forced."""
+    if not force_cpu and torch.cuda.is_available():
+        vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
+        if vram_gb >= min_vram_gb:
+            return 'auto'
+    return 'cpu'
+
+
 
 class StoppingCriteriaSub(StoppingCriteria):
     """Stop generations when they match a particular text or token."""
@@ -28,7 +37,7 @@ class StoppingCriteriaSub(StoppingCriteria):
         self.tokenizer = tokenizer
         self.match_on = match_on
         if self.match_on == 'tokens':
-            self.stops = [torch.tensor(self.tokenizer.encode(i)).to('cuda') for i in self.stops]
+            self.stops = [torch.tensor(self.tokenizer.encode(i)) for i in self.stops]
             print(self.stops)
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor):
@@ -85,7 +94,7 @@ def remove_split_layer(device_map_in):
 class HuggingfaceModel(BaseModel):
     """Hugging Face Model."""
 
-    def __init__(self, model_name, stop_sequences=None, max_new_tokens=None):
+    def __init__(self, model_name, stop_sequences=None, max_new_tokens=None, force_cpu=False):
         if max_new_tokens is None:
             raise
         self.max_new_tokens = max_new_tokens
@@ -93,7 +102,17 @@ class HuggingfaceModel(BaseModel):
         if stop_sequences == 'default':
             stop_sequences = STOP_SEQUENCES
 
-        if 'llama' in model_name.lower():
+        if 'tinyllama' in model_name.lower():
+            model_id = f'TinyLlama/{model_name}'
+            device_map = _get_device_map(min_vram_gb=4, force_cpu=force_cpu)
+            dtype = torch.float16 if device_map == 'auto' else torch.float32
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_id, token_type_ids=None,
+                clean_up_tokenization_spaces=False)
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_id, device_map=device_map, torch_dtype=dtype)
+
+        elif 'llama' in model_name.lower():
             if model_name.endswith('-8bit'):
                 kwargs = {'quantization_config': BitsAndBytesConfig(
                     load_in_8bit=True,)}
@@ -150,6 +169,17 @@ class HuggingfaceModel(BaseModel):
             else:
                 raise ValueError
 
+        elif 'phi-2' in model_name.lower():
+            model_id = f'microsoft/{model_name}'
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_id, token_type_ids=None,
+                clean_up_tokenization_spaces=False, trust_remote_code=True)
+            device_map = _get_device_map(min_vram_gb=6, force_cpu=force_cpu)
+            dtype = torch.float16 if device_map == 'auto' else torch.float32
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_id, device_map=device_map, torch_dtype=dtype,
+                trust_remote_code=True)
+
         elif 'mistral' in model_name.lower():
 
             if model_name.endswith('-8bit'):
@@ -200,7 +230,8 @@ class HuggingfaceModel(BaseModel):
     def predict(self, input_data, temperature, return_full=False):
 
         # Implement prediction.
-        inputs = self.tokenizer(input_data, return_tensors="pt").to("cuda")
+        device = next(self.model.parameters()).device
+        inputs = self.tokenizer(input_data, return_tensors="pt").to(device)
 
         if 'llama' in self.model_name.lower() or 'falcon' in self.model_name or 'mistral' in self.model_name.lower():
             if 'token_type_ids' in inputs:  # Some HF models have changed.
@@ -368,7 +399,8 @@ class HuggingfaceModel(BaseModel):
         """Get the probability of the model anwering A (True) for the given input."""
 
         input_data += ' A'
-        tokenized_prompt_true = self.tokenizer(input_data, return_tensors='pt').to('cuda')['input_ids']
+        device = next(self.model.parameters()).device
+        tokenized_prompt_true = self.tokenizer(input_data, return_tensors='pt').to(device)['input_ids']
         # The computation of the negative log likelihoods follows:
         # https://huggingface.co/docs/transformers/perplexity.
 

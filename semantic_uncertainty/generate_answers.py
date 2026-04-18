@@ -39,7 +39,7 @@ def main(args):
     user = os.environ['USER']
     slurm_jobid = os.getenv('SLURM_JOB_ID', None)
     scratch_dir = os.getenv('SCRATCH_DIR', '.')
-    parent_dir = os.path.abspath(os.path.join(scratch_dir, os.pardir)) # added modif in our evsme project
+    parent_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
     
     # modif in our evsme project
     # if not os.path.exists(f"{scratch_dir}/{user}/uncertainty"):

@@ -64,3 +64,7 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+EXP/
+Api_keys
+hf_cache/
+.claude/
