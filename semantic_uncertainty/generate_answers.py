@@ -178,7 +178,8 @@ def main(args):
         for index in tqdm(indices):
             if (it + 1 % 10) == 0:
                 gc.collect()
-                torch.cuda.empty_cache()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
             it += 1
 
             # Grab example at index.
@@ -298,7 +299,8 @@ if __name__ == '__main__':
         # Follow with uncertainty calculation script by default.
         args.assign_new_wandb_id = False
         gc.collect()
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         logging.info(50 * '#X')
         logging.info('STARTING `compute_uncertainty_measures`!')
         main_compute(args)

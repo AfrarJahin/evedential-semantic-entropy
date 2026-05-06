@@ -26,8 +26,9 @@ def set_hf_caches(ds_cache, eval_cache):
 def get_device():
     if torch.cuda.is_available():
         return "cuda"
-    else:
-        return "cpu"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
 
 
 class CPU_Unpickler(pickle.Unpickler):

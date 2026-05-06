@@ -23,6 +23,8 @@ ENV/
 .env/
 .conda/
 
+
+api_keys.txt
 # Conda-generated temporary requirement files
 condaenv.*.requirements.txt
 
@@ -68,3 +70,4 @@ EXP/
 Api_keys
 hf_cache/
 .claude/
+.worktrees/

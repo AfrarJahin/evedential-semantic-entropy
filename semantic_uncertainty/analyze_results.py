@@ -198,6 +198,38 @@ def analyze_run(
                 result_dict['uncertainty'][name][fname]['bootstrap'] = bootstrap_results
 
     wandb.log(result_dict)
+
+    # Write human-readable results to a plain text file.
+    results_path = os.path.join(wandb.run.dir, 'results_summary.txt')
+    with open(results_path, 'w') as f:
+        f.write(f'Run: {wandb_runid}\n')
+        f.write('=' * 60 + '\n\n')
+
+        f.write('PERFORMANCE\n' + '-' * 40 + '\n')
+        for name, vals in result_dict['performance'].items():
+            mean = vals.get('mean', float('nan'))
+            bs = vals.get('bootstrap', None)
+            if isinstance(bs, dict):
+                lo = bs.get('confidence_interval', [float('nan'), float('nan')])[0]
+                hi = bs.get('confidence_interval', [float('nan'), float('nan')])[1]
+                f.write(f'  {name}: {mean:.4f}  [{lo:.4f}, {hi:.4f}]\n')
+            else:
+                f.write(f'  {name}: {mean:.4f}\n')
+
+        f.write('\nUNCERTAINTY METRICS\n' + '-' * 40 + '\n')
+        for measure, metrics in result_dict['uncertainty'].items():
+            f.write(f'\n  {measure}\n')
+            for fname, vals in metrics.items():
+                mean = vals.get('mean', float('nan'))
+                bs = vals.get('bootstrap', None)
+                if isinstance(bs, dict):
+                    lo = bs.get('confidence_interval', [float('nan'), float('nan')])[0]
+                    hi = bs.get('confidence_interval', [float('nan'), float('nan')])[1]
+                    f.write(f'    {fname}: {mean:.4f}  [{lo:.4f}, {hi:.4f}]\n')
+                else:
+                    f.write(f'    {fname}: {mean:.4f}\n')
+
+    print(f'Results saved to {results_path}')
     logging.info(
         'Analysis for wandb_runid `%s` finished. Full results dict: %s',
         wandb_runid, result_dict

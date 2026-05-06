@@ -9,7 +9,12 @@ import accelerate
 from transformers import AutoTokenizer
 from transformers import AutoConfig
 from transformers import AutoModelForCausalLM
-from transformers import BitsAndBytesConfig
+try:
+    from transformers import BitsAndBytesConfig
+    _bnb_available = True
+except ImportError:
+    BitsAndBytesConfig = None
+    _bnb_available = False
 from transformers import StoppingCriteria
 from transformers import StoppingCriteriaList
 from huggingface_hub import snapshot_download
@@ -18,13 +23,35 @@ from huggingface_hub import snapshot_download
 from uncertainty.models.base_model import BaseModel
 from uncertainty.models.base_model import STOP_SEQUENCES
 
-def _get_device_map(min_vram_gb=4, force_cpu=False):
-    """Use GPU only if CUDA is available, has enough VRAM, and CPU not forced."""
-    if not force_cpu and torch.cuda.is_available():
-        vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
-        if vram_gb >= min_vram_gb:
-            return 'auto'
+def _get_device(force_cpu=False):
+    """Return the best available device: cuda > mps > cpu."""
+    if not force_cpu:
+        if torch.cuda.is_available():
+            return 'cuda'
+        if torch.backends.mps.is_available():
+            return 'mps'
     return 'cpu'
+
+
+def _get_dtype(device):
+    """Return appropriate dtype for the given device."""
+    if device == 'cuda':
+        return torch.float16
+    if device == 'mps':
+        return torch.bfloat16
+    return torch.float32
+
+
+def _load_model(model_id, device, dtype, trust_remote_code=False, **kwargs):
+    """Load a model onto the given device, handling CUDA vs MPS/CPU paths."""
+    if device == 'cuda':
+        return AutoModelForCausalLM.from_pretrained(
+            model_id, device_map='auto', torch_dtype=dtype,
+            trust_remote_code=trust_remote_code, **kwargs)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_id, torch_dtype=dtype,
+        trust_remote_code=trust_remote_code, **kwargs)
+    return model.to(device)
 
 
 
@@ -104,18 +131,20 @@ class HuggingfaceModel(BaseModel):
 
         if 'tinyllama' in model_name.lower():
             model_id = f'TinyLlama/{model_name}'
-            device_map = _get_device_map(min_vram_gb=4, force_cpu=force_cpu)
-            dtype = torch.float16 if device_map == 'auto' else torch.float32
+            device = _get_device(force_cpu=force_cpu)
+            dtype = _get_dtype(device)
             self.tokenizer = AutoTokenizer.from_pretrained(
                 model_id, token_type_ids=None,
                 clean_up_tokenization_spaces=False)
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_id, device_map=device_map, torch_dtype=dtype)
+            self.model = _load_model(model_id, device, dtype)
 
         elif 'llama' in model_name.lower():
+            device = _get_device(force_cpu=force_cpu)
             if model_name.endswith('-8bit'):
-                kwargs = {'quantization_config': BitsAndBytesConfig(
-                    load_in_8bit=True,)}
+                if _bnb_available and device == 'cuda':
+                    kwargs = {'quantization_config': BitsAndBytesConfig(load_in_8bit=True)}
+                else:
+                    kwargs = {}
                 model_name = model_name[:-len('-8bit')]
                 eightbit = True
             else:
@@ -130,18 +159,20 @@ class HuggingfaceModel(BaseModel):
                 base = 'huggyllama'
 
             self.tokenizer = AutoTokenizer.from_pretrained(
-                f"{base}/{model_name}", device_map="auto",
-                token_type_ids=None)
+                f"{base}/{model_name}", token_type_ids=None)
 
             llama65b = '65b' in model_name and base == 'huggyllama'
             llama2_70b = '70b' in model_name and base == 'meta-llama'
 
             if ('7b' in model_name or "8B" in model_name or '13b' in model_name) or eightbit:
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    f"{base}/{model_name}", device_map="auto",
-                    max_memory={0: '80GIB'}, **kwargs,)
+                dtype = _get_dtype(device)
+                self.model = _load_model(f"{base}/{model_name}", device, dtype, **kwargs)
 
             elif llama2_70b or llama65b:
+                if device != 'cuda':
+                    raise ValueError(
+                        f'Llama 70B/65B requires CUDA (current device: {device}). '
+                        'This model is too large for MPS or CPU.')
                 path = snapshot_download(
                     repo_id=f'{base}/{model_name}',
                     allow_patterns=['*.json', '*.model', '*.safetensors'],
@@ -171,55 +202,50 @@ class HuggingfaceModel(BaseModel):
 
         elif 'phi-2' in model_name.lower():
             model_id = f'microsoft/{model_name}'
+            device = _get_device(force_cpu=force_cpu)
+            dtype = _get_dtype(device)
             self.tokenizer = AutoTokenizer.from_pretrained(
                 model_id, token_type_ids=None,
                 clean_up_tokenization_spaces=False, trust_remote_code=True)
-            device_map = _get_device_map(min_vram_gb=6, force_cpu=force_cpu)
-            dtype = torch.float16 if device_map == 'auto' else torch.float32
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_id, device_map=device_map, torch_dtype=dtype,
-                trust_remote_code=True)
+            self.model = _load_model(model_id, device, dtype, trust_remote_code=True)
 
         elif 'mistral' in model_name.lower():
+            device = _get_device(force_cpu=force_cpu)
+            dtype = _get_dtype(device)
 
             if model_name.endswith('-8bit'):
-                kwargs = {'quantization_config': BitsAndBytesConfig(
-                    load_in_8bit=True,)}
+                if _bnb_available and device == 'cuda':
+                    kwargs = {'quantization_config': BitsAndBytesConfig(load_in_8bit=True)}
+                else:
+                    kwargs = {}
                 model_name = model_name[:-len('-8bit')]
-            if model_name.endswith('-4bit'):
-                kwargs = {'quantization_config': BitsAndBytesConfig(
-                    load_in_4bit=True,)}
+            elif model_name.endswith('-4bit'):
+                if _bnb_available and device == 'cuda':
+                    kwargs = {'quantization_config': BitsAndBytesConfig(load_in_4bit=True)}
+                else:
+                    kwargs = {}
                 model_name = model_name[:-len('-4bit')]
             else:
                 kwargs = {}
 
             model_id = f'mistralai/{model_name}'
             self.tokenizer = AutoTokenizer.from_pretrained(
-                model_id, device_map='auto', token_type_ids=None,
+                model_id, token_type_ids=None,
                 clean_up_tokenization_spaces=False)
-
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_id,
-                device_map='auto',
-                max_memory={0: '80GIB'},
-                **kwargs,
-            )
+            self.model = _load_model(model_id, device, dtype, **kwargs)
 
         elif 'falcon' in model_name:
             model_id = f'tiiuae/{model_name}'
+            device = _get_device(force_cpu=force_cpu)
+            dtype = _get_dtype(device)
             self.tokenizer = AutoTokenizer.from_pretrained(
-                model_id, device_map='auto', token_type_ids=None,
+                model_id, token_type_ids=None,
                 clean_up_tokenization_spaces=False)
-
-            kwargs = {'quantization_config': BitsAndBytesConfig(
-                load_in_8bit=True,)}
-
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_id,
-                trust_remote_code=True,
-                device_map='auto',
-                **kwargs,
-            )
+            if _bnb_available and device == 'cuda':
+                kwargs = {'quantization_config': BitsAndBytesConfig(load_in_8bit=True)}
+            else:
+                kwargs = {}
+            self.model = _load_model(model_id, device, dtype, trust_remote_code=True, **kwargs)
         else:
             raise ValueError
 
