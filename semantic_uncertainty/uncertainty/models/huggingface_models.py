@@ -308,10 +308,8 @@ class HuggingfaceModel(BaseModel):
                 error_msg = 'Error: Stop words not removed successfully!'
                 error_msg += f'Answer: >{answer}< '
                 error_msg += f'Sliced Answer: >{sliced_answer}<'
-                if 'falcon' not in self.model_name.lower():
-                    raise ValueError(error_msg)
-                else:
-                    logging.error(error_msg)
+                logging.warning(error_msg)
+                sliced_answer = ''
 
         # Remove whitespaces from answer (in particular from beginning.)
         sliced_answer = sliced_answer.strip()
