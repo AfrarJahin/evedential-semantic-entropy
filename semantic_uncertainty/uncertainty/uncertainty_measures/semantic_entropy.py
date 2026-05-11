@@ -15,7 +15,7 @@ from uncertainty.utils import openai as oai
 from uncertainty.utils import utils
 
 
-DEVICE = "cpu"
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class BaseEntailment:
