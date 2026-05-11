@@ -145,9 +145,18 @@ class HuggingfaceModel(BaseModel):
 
             if small_model or eightbit:
                 device_map = _get_device_map(min_vram_gb=4, force_cpu=force_cpu)
+                if eightbit and device_map != 'auto':
+                    raise RuntimeError(
+                        "8-bit quantization requires a CUDA GPU, but none was found "
+                        "(or VRAM < 4 GB). In Colab: Runtime → Change runtime type → GPU. "
+                        "Or use the model name without '-8bit' to run in fp32 on CPU."
+                    )
                 dtype = torch.float16 if device_map == 'auto' else torch.float32
+                # For 8-bit, force all layers onto cuda:0 to prevent accelerate's
+                # auto-mapper from spilling layers to CPU (which bitsandbytes rejects).
+                effective_device_map = {'': 0} if eightbit and device_map == 'auto' else device_map
                 self.model = AutoModelForCausalLM.from_pretrained(
-                    model_id, device_map=device_map, torch_dtype=dtype, **kwargs)
+                    model_id, device_map=effective_device_map, torch_dtype=dtype, **kwargs)
 
             elif llama2_70b or llama65b:
                 path = snapshot_download(

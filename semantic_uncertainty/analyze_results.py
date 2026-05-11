@@ -110,9 +110,12 @@ def analyze_run(
         target, target_hp = split_target(target, num_test_samples=num_test_samples)
         for name, target in zip([name, f"{name}_hp"], [target, target_hp]):
             result_dict['performance'][name] = {}
-            if len(target):           
+            if len(target) >= 2:
                 result_dict['performance'][name]['mean'] = np.mean(target)
                 result_dict['performance'][name]['bootstrap'] = bootstrap(np.mean, rng)(target)
+            elif len(target) == 1:
+                result_dict['performance'][name]['mean'] = np.mean(target)
+                result_dict['performance'][name]['bootstrap'] = np.nan
             else:
                 result_dict['performance'][name]['mean'] = np.nan
                 result_dict['performance'][name]['bootstrap'] = np.nan
