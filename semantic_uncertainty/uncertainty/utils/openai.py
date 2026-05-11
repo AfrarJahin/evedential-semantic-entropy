@@ -5,7 +5,7 @@ from tenacity import retry, wait_random_exponential, retry_if_not_exception_type
 from openai import OpenAI
 
 
-CLIENT = OpenAI(api_key=os.environ.get('OPENAI_API_KEY', False))
+CLIENT = None
 
 
 class KeyError(Exception):
@@ -13,12 +13,21 @@ class KeyError(Exception):
     pass
 
 
+def _get_client():
+    global CLIENT
+    if CLIENT is None:
+        api_key = os.environ.get('OPENAI_API_KEY')
+        if not api_key:
+            raise KeyError('Need to provide OpenAI API key in environment variable `OPENAI_API_KEY`.')
+        CLIENT = OpenAI(api_key=api_key)
+    return CLIENT
+
+
 @retry(retry=retry_if_not_exception_type(KeyError), wait=wait_random_exponential(min=1, max=10))
 def predict(prompt, temperature=1.0, model='gpt-4'):
     """Predict with GPT models."""
 
-    if not CLIENT.api_key:
-        raise KeyError('Need to provide OpenAI API key in environment variable `OPENAI_API_KEY`.')
+    client = _get_client()
 
     if isinstance(prompt, str):
         messages = [
@@ -34,7 +43,7 @@ def predict(prompt, temperature=1.0, model='gpt-4'):
     elif model == 'gpt-3.5':
         model = 'gpt-3.5-turbo-1106'
 
-    output = CLIENT.chat.completions.create(
+    output = client.chat.completions.create(
         model=model,
         messages=messages,
         max_tokens=200,

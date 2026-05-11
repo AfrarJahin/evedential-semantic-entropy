@@ -100,6 +100,15 @@ python semantic_uncertainty/generate_answers.py \
     --random_seed=42 \
     --compute_kle
 ```
+$env:HF_TOKEN = "hf_..."
+
+python semantic_uncertainty/generate_answers.py `
+    --model_name=meta-llama/Llama-3.2-1B-Instruct `
+    --dataset=trivia_qa `
+    --num_samples=5 `
+    --num_generations=3 `
+    --random_seed=42 `
+    --force_cpu
 
 
 test experiment:
@@ -113,6 +122,15 @@ python semantic_uncertainty/generate_answers.py \
     --force_cpu
 
 ```
+python semantic_uncertainty/generate_answers.py  --model_name=TinyLlama-1.1B-Chat-v1.0   --dataset=trivia_qa   --num_samples=5   --num_generations=3  --random_seed=42  --force_cpu --no-compute_p_true
+
+
+python semantic_uncertainty/generate_answers.py  --model_name=meta-llama/Llama-3.2-1B-Instruct --dataset=trivia_qa --num_samples=5 --num_generations=3 --random_seed=42 --force_cpu
+
+
+EXP\wandb\offline-run-20260507_021501-30yoxokf
+python summarize_results.py "EXP/wandb/offline-run-20260507_095112-vethugzo" --json
+
 
 - `$MODEL` is one of:
   `Llama-2-7b`, `Llama-2-13b`, `Llama-2-7b-chat`, `Llama-2-13b-chat`,

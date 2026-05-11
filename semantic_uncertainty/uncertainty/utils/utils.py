@@ -382,6 +382,11 @@ def get_metric(metric):
 
 
 def save(object, file):
-    with open(f'{wandb.run.dir}/{file}', 'wb') as f:
+    path = f'{wandb.run.dir}/{file}'
+    with open(path, 'wb') as f:
         pickle.dump(object, f)
-    wandb.save(f'{wandb.run.dir}/{file}')
+    try:
+        wandb.save(path)
+    except OSError:
+        # wandb.save uses symlinks which require Developer Mode on Windows; skip silently
+        pass

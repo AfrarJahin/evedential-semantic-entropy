@@ -129,26 +129,34 @@ class HuggingfaceModel(BaseModel):
             else:
                 base = 'huggyllama'
 
+            # Support passing full model IDs like meta-llama/Llama-3.2-1B-Instruct
+            if '/' in model_name:
+                model_id = model_name
+            else:
+                model_id = f"{base}/{model_name}"
+
             self.tokenizer = AutoTokenizer.from_pretrained(
-                f"{base}/{model_name}", device_map="auto",
-                token_type_ids=None)
+                model_id, token_type_ids=None)
 
             llama65b = '65b' in model_name and base == 'huggyllama'
             llama2_70b = '70b' in model_name and base == 'meta-llama'
 
-            if ('7b' in model_name or "8B" in model_name or '13b' in model_name) or eightbit:
+            small_model = any(s in model_name for s in ('1b', '1B', '3b', '3B', '7b', '7B', '8B', '13b', '13B'))
+
+            if small_model or eightbit:
+                device_map = _get_device_map(min_vram_gb=4, force_cpu=force_cpu)
+                dtype = torch.float16 if device_map == 'auto' else torch.float32
                 self.model = AutoModelForCausalLM.from_pretrained(
-                    f"{base}/{model_name}", device_map="auto",
-                    max_memory={0: '80GIB'}, **kwargs,)
+                    model_id, device_map=device_map, torch_dtype=dtype, **kwargs)
 
             elif llama2_70b or llama65b:
                 path = snapshot_download(
-                    repo_id=f'{base}/{model_name}',
+                    repo_id=model_id,
                     allow_patterns=['*.json', '*.model', '*.safetensors'],
                     ignore_patterns=['pytorch_model.bin.index.json']
                 )
 
-                config = AutoConfig.from_pretrained(f"{base}/{model_name}")
+                config = AutoConfig.from_pretrained(model_id)
                 with accelerate.init_empty_weights():
                     self.model = AutoModelForCausalLM.from_config(config)
                 self.model.tie_weights()

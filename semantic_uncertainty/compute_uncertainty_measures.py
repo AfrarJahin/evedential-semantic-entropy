@@ -184,7 +184,7 @@ def main(args):
     if args.train_wandb_runid is None:
         args.train_wandb_runid = args.eval_wandb_runid
 
-    user = os.environ['USER']
+    user = os.environ.get('USER') or os.environ.get('USERNAME', 'user')
     scratch_dir = os.getenv('SCRATCH_DIR', '.')
     parent_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
     wandb_dir = f'{parent_dir}/EXP'

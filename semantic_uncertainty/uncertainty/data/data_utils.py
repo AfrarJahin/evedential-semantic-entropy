@@ -7,7 +7,7 @@ import datasets
 
 def load_ds(dataset_name, seed, add_options=None):
     """Load dataset."""
-    user = os.environ['USER']
+    user = os.environ.get('USER') or os.environ.get('USERNAME', 'user')
 
     train_dataset, validation_dataset = None, None
     if dataset_name == "squad":

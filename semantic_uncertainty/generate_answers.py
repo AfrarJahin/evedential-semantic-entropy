@@ -4,7 +4,13 @@ import os
 import logging
 import random
 from tqdm import tqdm
-import fcntl # (evsme project)
+try:
+    import fcntl  # Unix only
+    def _lock(f): fcntl.flock(f, fcntl.LOCK_EX)
+    def _unlock(f): fcntl.flock(f, fcntl.LOCK_UN)
+except ImportError:  # Windows
+    def _lock(f): pass
+    def _unlock(f): pass
 
 import numpy as np
 import torch
@@ -36,7 +42,7 @@ def main(args):
     experiment_details = {'args': args}
     random.seed(args.random_seed)
     torch.manual_seed(args.random_seed) # added modif in our evsme project
-    user = os.environ['USER']
+    user = os.environ.get('USER') or os.environ.get('USERNAME', 'user')
     slurm_jobid = os.getenv('SLURM_JOB_ID', None)
     scratch_dir = os.getenv('SCRATCH_DIR', '.')
     parent_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
@@ -66,9 +72,9 @@ def main(args):
 
             # Append new data to the text file (evsme project)
             with open(experiment_data_path, 'a') as file:
-                fcntl.flock(file, fcntl.LOCK_EX)
+                _lock(file)
                 file.write(f"{run.id}: {run.config.as_dict()}\n")
-                fcntl.flock(file, fcntl.LOCK_UN)
+                _unlock(file)
 
             break
         except:
@@ -79,9 +85,11 @@ def main(args):
     metric = utils.get_metric(args.metric)
 
     # Load dataset.
+    logging.warning('Downloading/loading dataset: %s (may take a few minutes on first run)...', args.dataset)
     wandb.log({"dataset": args.dataset})
     train_dataset, validation_dataset = load_ds(
         args.dataset, add_options=args.use_mc_options, seed=args.random_seed)
+    logging.warning('Dataset loaded. Train: %d samples, Validation: %d samples.', len(train_dataset), len(validation_dataset))
     if args.ood_train_dataset is not None:
         logging.warning(
             'Using OOD dataset %s to construct few-shot prompts and train p_ik.',
@@ -115,15 +123,16 @@ def main(args):
     logging.info('Prompt is: %s', prompt)
 
     # Initialize model.
+    logging.warning('Loading model: %s (may take several minutes on CPU)...', args.model_name)
     wandb.log({"model": args.model_name})
     #os.environ["TRANSFORMERS_OFFLINE"] = "1"
     model = utils.init_model(args)
     #os.environ["TRANSFORMERS_OFFLINE"] = "0"
+    logging.warning('Model loaded successfully.')
 
     # Initialize prompt for p_true baseline.
     if args.compute_p_true:
-        logging.info(80*'#')
-        logging.info('Constructing few-shot prompt for p_true.')
+        logging.warning('Constructing p_true few-shot prompt (%d inference passes, slow on CPU)...', args.p_true_num_fewshot)
 
         p_true_indices = random.sample(answerable_indices, args.p_true_num_fewshot)
         remaining_answerable = list(set(remaining_answerable) - set(p_true_indices))
@@ -139,8 +148,7 @@ def main(args):
         experiment_details['p_true_indices'] = p_true_indices
         experiment_details['p_true_responses'] = p_true_responses
         experiment_details['p_true_few_shot_prompt'] = p_true_few_shot_prompt
-        logging.info('Finished constructing few-shot prompt for p_true.')
-        logging.info(80*'#')
+        logging.warning('Finished constructing p_true few-shot prompt.')
         logging.info('p_true_few_shot_prompt: %s', p_true_few_shot_prompt)
         logging.info(80*'#')
 

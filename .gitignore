@@ -40,6 +40,7 @@ condaenv.*.requirements.txt
 EXP/
 outputs/
 results/
+api_keys.txt
 runs/
 wandb/
 logs/
