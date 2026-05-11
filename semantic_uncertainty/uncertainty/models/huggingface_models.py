@@ -299,8 +299,9 @@ class HuggingfaceModel(BaseModel):
         sliced_answer = answer
         if self.stop_sequences is not None:
             for stop in self.stop_sequences:
-                if answer.endswith(stop):
-                    stop_at = len(answer) - len(stop)
+                idx = answer.find(stop)
+                if idx != -1:
+                    stop_at = idx
                     sliced_answer = answer[:stop_at]
                     break
             if not all([stop not in sliced_answer for stop in self.stop_sequences]):
