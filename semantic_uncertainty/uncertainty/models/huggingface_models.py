@@ -103,7 +103,7 @@ class HuggingfaceModel(BaseModel):
             stop_sequences = STOP_SEQUENCES
 
         if 'tinyllama' in model_name.lower():
-            model_id = f'TinyLlama/{model_name}'
+            model_id = model_name if '/' in model_name else f'TinyLlama/{model_name}'
             device_map = _get_device_map(min_vram_gb=4, force_cpu=force_cpu)
             dtype = torch.float16 if device_map == 'auto' else torch.float32
             self.tokenizer = AutoTokenizer.from_pretrained(
