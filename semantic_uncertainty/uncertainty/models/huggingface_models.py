@@ -332,8 +332,8 @@ class HuggingfaceModel(BaseModel):
         n_input_token = len(inputs['input_ids'][0])
         n_generated = token_stop_index - n_input_token
 
-        if n_generated == 0:
-            logging.warning('Only stop_words were generated. For likelihoods and embeddings, taking stop word instead.')
+        if n_generated <= 0:
+            logging.warning('Only stop_words were generated (or tokenization boundary mismatch). For likelihoods and embeddings, taking stop word instead.')
             n_generated = 1
 
         # Get the last hidden state (last layer) and the last token's embedding of the answer.
@@ -355,7 +355,12 @@ class HuggingfaceModel(BaseModel):
         else:
             hidden = outputs.hidden_states
 
-        if len(hidden) == 1:
+        if len(hidden) == 0:
+            raise ValueError(
+                f'hidden_states is empty (no tokens generated). '
+                f'n_generated: {n_generated}, n_input_token: {n_input_token}, '
+                f'token_stop_index: {token_stop_index}, generation: {full_answer!r}')
+        elif len(hidden) == 1:
             logging.warning(
                 'Taking first and only generation for hidden! '
                 'n_generated: %d, n_input_token: %d, token_stop_index %d, '
