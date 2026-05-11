@@ -425,13 +425,13 @@ class HuggingfaceModel(BaseModel):
         # The computation of the negative log likelihoods follows:
         # https://huggingface.co/docs/transformers/perplexity.
 
-        target_ids_true = tokenized_prompt_true.clone()
-        # Set all target_ids except the last one to -100.
-        target_ids_true[0, :-1] = -100
-
         with torch.no_grad():
-            model_output_true = self.model(tokenized_prompt_true, labels=target_ids_true)
+            model_output_true = self.model(tokenized_prompt_true)
 
-        loss_true = model_output_true.loss
+        # Compute log-prob of the last token only, staying in fp16 to avoid OOM
+        # from the fp32 cast that HuggingFace's built-in loss triggers.
+        last_logits = model_output_true.logits[0, -2, :]  # logits predicting final token
+        last_token_id = tokenized_prompt_true[0, -1]
+        log_prob = torch.nn.functional.log_softmax(last_logits, dim=-1)[last_token_id]
 
-        return -loss_true.item()
+        return log_prob.item()
