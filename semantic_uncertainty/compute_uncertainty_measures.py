@@ -48,7 +48,7 @@ import kle
 utils.setup_logger()
 
 # bug in wandb
-#os.environ["WANDB__SERVICE_WAIT"] = "300"
+os.environ["WANDB__SERVICE_WAIT"] = "300"
 
 EXP_DETAILS = 'experiment_details.pkl'
 ALPHAS_RANGE = np.arange(0, 1.01, 0.1)
