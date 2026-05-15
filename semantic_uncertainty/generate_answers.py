@@ -77,6 +77,18 @@ def main(args):
                 file.write(f"{run.id}: {run.config.as_dict()}\n")
                 _unlock(file)
 
+            # Create a human-readable symlink in EXP/ pointing to the wandb run dir.
+            run_label = f"{args.model_name.split('/')[-1]}-{args.dataset}-seed{args.random_seed}"
+            symlink_base = os.path.join(parent_dir, "EXP", run_label)
+            symlink_path = symlink_base
+            counter = 1
+            while os.path.exists(symlink_path):
+                symlink_path = f"{symlink_base}_{counter}"
+                counter += 1
+            run_dir = os.path.dirname(run.dir)  # run.dir is .../files/, parent is the run dir
+            os.symlink(run_dir, symlink_path)
+            logging.info('Created symlink: %s -> %s', symlink_path, run_dir)
+
             break
         except:
             time.sleep(10 * 60)
