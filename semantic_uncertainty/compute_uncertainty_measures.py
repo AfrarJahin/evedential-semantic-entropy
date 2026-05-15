@@ -482,7 +482,7 @@ def main(args):
 
                 # ajouter ici : 
                 our_clusters = get_semantic_ids_and_hierarchy(unique_responses, entailements_full_matrix)['c']
-                their_clusters = semantic_ids = get_semantic_ids( unique_responses, model=entailment_model, strict_entailment=args.strict_entailment, example=example)
+                their_clusters = get_semantic_ids(unique_responses, model=entailment_model, strict_entailment=args.strict_entailment, example=example)
 
 
                 result_dict['our_clusters'].append(our_clusters)
