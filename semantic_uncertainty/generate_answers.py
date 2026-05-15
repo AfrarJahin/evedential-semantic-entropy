@@ -66,6 +66,7 @@ def main(args):
                 # dir=f"{scratch_dir}/{user}/uncertainty",
                 dir=f"{parent_dir}/EXP",
                 config=args,
+                name=f"{args.model_name.split('/')[-1]}-{args.dataset}-seed{args.random_seed}",
                 notes=f'slurm_id: {slurm_jobid}, experiment_lot: {args.experiment_lot}',
                 tags=[args.model_name, args.dataset, args.brief_prompt, args.experiment_lot]
             )

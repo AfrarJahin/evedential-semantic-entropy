@@ -16,6 +16,35 @@ import pickle
 import argparse
 from pathlib import Path
 
+try:
+    import numpy as np
+    from sklearn import metrics as sk_metrics
+    _HAS_SKLEARN = True
+except ImportError:
+    _HAS_SKLEARN = False
+
+
+def _auroc(y_true, y_score):
+    y_true, y_score = np.array(y_true), np.array(y_score)
+    if len(np.unique(y_true)) < 2:
+        return float("nan")
+    fpr, tpr, _ = sk_metrics.roc_curve(y_true, y_score)
+    return float(sk_metrics.auc(fpr, tpr))
+
+
+def _auarc(accuracies, uncertainties):
+    """Area under accuracy-rejection curve (higher = better)."""
+    accuracies = np.array(accuracies)
+    uncertainties = np.array(uncertainties)
+    quantiles = np.linspace(0.1, 1, 20)
+    accs = []
+    for q in quantiles:
+        cutoff = np.quantile(uncertainties, q)
+        sel = uncertainties <= cutoff
+        accs.append(float(np.mean(accuracies[sel])) if sel.any() else float("nan"))
+    dx = float(quantiles[1] - quantiles[0])
+    return float(np.nansum(np.array(accs) * dx))
+
 
 def load_pkl(path):
     with open(path, "rb") as f:
@@ -173,6 +202,21 @@ def build_summary(run_dir: Path) -> dict:
                 if i < len(vals):
                     q.setdefault("uncertainty", {})[measure] = vals[i]
 
+        # ------------------------------------------------- AUROC / AUARC
+        if _HAS_SKLEARN:
+            is_false_raw = unc.get("validation_is_false", None)
+            if is_false_raw is not None:
+                is_false = [float(x) for x in is_false_raw]
+                accuracy = [1.0 - x for x in is_false]
+                roc_arc = {}
+                for name, vals in unc_per_question.items():
+                    if len(vals) == len(is_false):
+                        roc_arc[name] = {
+                            "auroc": round(_auroc(is_false, vals), 4),
+                            "auarc": round(_auarc(accuracy, vals), 4),
+                        }
+                summary["auroc_auarc"] = roc_arc
+
     summary["run_dir"] = str(run_dir)
     return summary
 
@@ -204,6 +248,19 @@ def print_summary(summary: dict):
                 print(f"  {k:<{col_w}} {v['mean']:>8.4f}  {v['min']:>8.4f}  {v['max']:>8.4f}  {v['n']:>5}")
             else:
                 print(f"  {k:<{col_w}} {float(v):>8.4f}")
+
+    if "auroc_auarc" in summary:
+        rr = summary["auroc_auarc"]
+        print_section("AUROC / AUARC")
+        col_w = 30
+        print(f"  {'Measure':<{col_w}} {'AUROC':>8}  {'AUARC':>8}")
+        separator("-")
+        for name, scores in rr.items():
+            auroc_val = scores.get("auroc", float("nan"))
+            auarc_val = scores.get("auarc", float("nan"))
+            auroc_str = f"{auroc_val:.4f}" if auroc_val == auroc_val else "   n/a"
+            auarc_str = f"{auarc_val:.4f}" if auarc_val == auarc_val else "   n/a"
+            print(f"  {name:<{col_w}} {auroc_str:>8}  {auarc_str:>8}")
 
     print_section("PER-QUESTION RESULTS (first 20)")
     col = [40, 26, 8]
@@ -386,6 +443,39 @@ def build_report(summary: dict) -> str:
         if pf_mean is not None:
             lines.append(f"    p_false_fixed of {pf_mean:.4f} directly estimates a {pf_mean*100:.0f}% error rate,")
             lines.append(f"    consistent with the observed {100 - acc['most_likely_correct_pct']:.0f}% incorrect rate.")
+        lines.append("")
+
+    # AUROC / AUARC
+    if "auroc_auarc" in summary:
+        sec("AUROC / AUARC  (uncertainty quality)")
+        rr = summary["auroc_auarc"]
+        lines.append("  AUROC  : Area under ROC curve. Measures how well the uncertainty")
+        lines.append("           score separates correct from incorrect answers.")
+        lines.append("           1.0 = perfect, 0.5 = random, <0.5 = inverted.")
+        lines.append("  AUARC  : Area under Accuracy-Rejection Curve. Accuracy when the")
+        lines.append("           most-uncertain fraction is abstained from.")
+        lines.append("           Higher = abstaining on uncertain items recovers more accuracy.")
+        lines.append("")
+        lines.append(f"  {'Measure':<30} {'AUROC':>8}  {'AUARC':>8}")
+        div()
+        for name, scores in rr.items():
+            auroc_val = scores.get("auroc", float("nan"))
+            auarc_val = scores.get("auarc", float("nan"))
+            auroc_str = f"{auroc_val:.4f}" if auroc_val == auroc_val else "  n/a  "
+            auarc_str = f"{auarc_val:.4f}" if auarc_val == auarc_val else "  n/a  "
+            lines.append(f"  {name:<30} {auroc_str:>8}  {auarc_str:>8}")
+        lines.append("")
+
+        # best / worst
+        valid = {k: v for k, v in rr.items() if v["auroc"] == v["auroc"]}
+        if valid:
+            best_auroc = max(valid, key=lambda k: valid[k]["auroc"])
+            best_auarc = max(valid, key=lambda k: valid[k]["auarc"])
+            lines.append("  INTERPRETATION:")
+            lines.append(f"    Best AUROC: {best_auroc} ({valid[best_auroc]['auroc']:.4f})")
+            lines.append(f"      → This measure best discriminates correct from incorrect answers.")
+            lines.append(f"    Best AUARC: {best_auarc} ({valid[best_auarc]['auarc']:.4f})")
+            lines.append(f"      → Abstaining on this measure's top-uncertain items recovers the most accuracy.")
         lines.append("")
 
     # per-question

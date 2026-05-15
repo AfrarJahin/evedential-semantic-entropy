@@ -38,13 +38,16 @@ condaenv.*.requirements.txt
 
 # Experiment outputs and logs
 EXP/
+EXP_results*/
 outputs/
 results/
 api_keys.txt
+Api_keys
 runs/
 wandb/
 logs/
 *.log
+*.zip
 
 # Data, checkpoints, and model artifacts
 data/
@@ -65,7 +68,5 @@ desktop.ini
 .idea/
 *.swp
 *.swo
-EXP/
-Api_keys
 hf_cache/
 .claude/
