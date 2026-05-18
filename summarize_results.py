@@ -26,6 +26,8 @@ except ImportError:
 
 def _auroc(y_true, y_score):
     y_true, y_score = np.array(y_true), np.array(y_score)
+    mask = ~np.isnan(y_score) & ~np.isnan(y_true)
+    y_true, y_score = y_true[mask], y_score[mask]
     if len(np.unique(y_true)) < 2:
         return float("nan")
     fpr, tpr, _ = sk_metrics.roc_curve(y_true, y_score)

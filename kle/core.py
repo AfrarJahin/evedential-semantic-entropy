@@ -48,9 +48,10 @@ def vn_entropy(K, normalize=True, scale=True, jitter=0):
     if normalize:
         K = normalize_kernel(K) / K.shape[0]
     result = 0
-    eigvs = np.linalg.eig(K + jitter * np.eye(K.shape[0])).eigenvalues.astype(np.float64)
+    eigvs = np.linalg.eigh(K + jitter * np.eye(K.shape[0])).eigenvalues.astype(np.float64)
+    eigvs = np.clip(eigvs, 0, None)  # kernel_sum can have tiny negative eigenvalues from numerical noise
     for e in eigvs:
-        if np.abs(e) > 1e-8:
+        if e > 1e-8:
             result -= e * np.log(e)
     if scale:
         result = scale_entropy(result, K.shape[0])
